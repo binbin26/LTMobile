@@ -1,0 +1,164 @@
+<resources>
+    <string name="app_name">LTMobile</string>
+
+    <!-- Navigation & Tabs -->
+    <string name="tab_home">Trang Chủ</string>
+    <string name="tab_calendar">Lịch</string>
+    <string name="tab_add">Thêm Mới</string>
+    <string name="tab_tasks">Nhiệm vụ</string>
+    <string name="tab_profile">Tài khoản</string>
+
+    <!-- Home Screen -->
+    <string name="home_upcoming_events">Sự kiện sắp tới</string>
+    <string name="home_no_events">Không có sự kiện hôm nay</string>
+    <string name="home_completed">Hoàn thành hết công việc!</string>
+    <string name="home_today">Hôm nay</string>
+    <string name="home_tomorrow">Ngày mai</string>
+    <string name="home_this_week">Tuần này</string>
+
+    <!-- Calendar Screen -->
+    <string name="calendar_month">Tháng</string>
+    <string name="calendar_week">Tuần</string>
+    <string name="calendar_select_date">Chọn ngày để xem chi tiết</string>
+    <string name="calendar_no_events">Không có sự kiện ngày này</string>
+
+    <!-- Task List Screen -->
+    <string name="tasks_due_today">Hạn hôm nay</string>
+    <string name="tasks_due_later">Hạn sau</string>
+    <string name="tasks_all">Tất cả</string>
+    <string name="tasks_empty">Không có nhiệm vụ nào</string>
+    <string name="tasks_completed">Bạn đã hoàn thành hết công việc!</string>
+    <string name="tasks_upcoming">Công việc sắp tới</string>
+    <string name="tasks_overdue">Công việc quá hạn</string>
+
+    <!-- Add/Edit Event Screen -->
+    <string name="event_title">Sự kiện</string>
+    <string name="event_add">Thêm Mới Sự Kiện</string>
+    <string name="event_edit">Sửa Sự Kiện</string>
+    <string name="event_name">Tên sự kiện</string>
+    <string name="event_description">Mô tả</string>
+    <string name="event_date">Ngày</string>
+    <string name="event_time">Giờ</string>
+    <string name="event_start_time">Giờ bắt đầu</string>
+    <string name="event_end_time">Giờ kết thúc</string>
+    <string name="event_location">Địa điểm</string>
+    <string name="event_category">Loại sự kiện</string>
+    <string name="event_priority">Mức độ ưu tiên</string>
+    <string name="event_all_day">Cả ngày</string>
+    <string name="event_reminder">Nhắc nhở</string>
+    <string name="event_reminder_enabled">Bật nhắc nhở</string>
+    <string name="event_reminder_disabled">Tắt nhắc nhở</string>
+    <string name="event_reminder_time">Nhắc nhở trước</string>
+    <string name="event_save">Lưu</string>
+    <string name="event_create">Tạo Sự Kiện</string>
+    <string name="event_delete">Xóa</string>
+    <string name="event_cancel">Hủy</string>
+    <string name="event_confirm_delete">Bạn có chắc chắn muốn xóa sự kiện này?</string>
+
+    <!-- Event Categories -->
+    <string name="category_study">Học tập</string>
+    <string name="category_assignment">Bài tập</string>
+    <string name="category_exam">Kiểm tra</string>
+    <string name="category_seminar">Seminar</string>
+    <string name="category_workshop">Workshop</string>
+    <string name="category_other">Khác</string>
+
+    <!-- Event Priority -->
+    <string name="priority_high">Cao</string>
+    <string name="priority_medium">Trung bình</string>
+    <string name="priority_low">Thấp</string>
+
+    <!-- Profile Screen -->
+    <string name="profile_title">Tài khoản</string>
+    <string name="profile_edit">Chỉnh sửa thông tin</string>
+    <string name="profile_edit_profile">Chỉnh sửa Hồ sơ</string>
+    <string name="profile_name">Tên</string>
+    <string name="profile_email">Email</string>
+    <string name="profile_avatar">Ảnh đại diện</string>
+    <string name="profile_change_avatar">Thay đổi ảnh đại diện</string>
+
+    <!-- Settings Section -->
+    <string name="settings_title">Cài đặt</string>
+    <string name="settings_general">Cài đặt chung</string>
+    <string name="settings_language">Ngôn ngữ</string>
+    <string name="settings_language_vi">Tiếng Việt</string>
+    <string name="settings_language_en">English</string>
+    <string name="settings_theme">Chế độ nền</string>
+    <string name="settings_theme_light">Sáng</string>
+    <string name="settings_theme_dark">Tối</string>
+    <string name="settings_theme_system">Theo hệ thống</string>
+    <string name="settings_notifications">Thông báo</string>
+    <string name="settings_notifications_title">Bật thông báo</string>
+    <string name="settings_sound">Âm thanh</string>
+    <string name="settings_vibration">Rung</string>
+    <string name="settings_privacy">Bảo mật và Quyền riêng tư</string>
+    <string name="settings_about">Về ứng dụng</string>
+
+    <!-- Logout & Auth -->
+    <string name="logout">Đăng xuất</string>
+    <string name="logout_confirm">Bạn có chắc chắn muốn đăng xuất?</string>
+    <string name="login">Đăng nhập</string>
+    <string name="register">Đăng ký</string>
+    <string name="password">Mật khẩu</string>
+    <string name="password_confirm">Xác nhận mật khẩu</string>
+    <string name="forgot_password">Quên mật khẩu?</string>
+
+    <!-- Common Actions -->
+    <string name="ok">OK</string>
+    <string name="cancel">Hủy</string>
+    <string name="save">Lưu</string>
+    <string name="delete">Xóa</string>
+    <string name="edit">Sửa</string>
+    <string name="close">Đóng</string>
+    <string name="back">Quay lại</string>
+    <string name="retry">Thử lại</string>
+    <string name="loading">Đang tải...</string>
+
+    <!-- Error Messages -->
+    <string name="error_title">Lỗi</string>
+    <string name="error_network">Không có kết nối mạng</string>
+    <string name="error_load_events">Không thể tải danh sách sự kiện</string>
+    <string name="error_save_event">Không thể lưu sự kiện</string>
+    <string name="error_delete_event">Không thể xóa sự kiện</string>
+    <string name="error_load_profile">Không thể tải thông tin người dùng</string>
+    <string name="error_update_profile">Không thể cập nhật thông tin</string>
+    <string name="error_upload_avatar">Không thể tải ảnh đại diện</string>
+    <string name="error_login">Không thể đăng nhập</string>
+    <string name="error_register">Không thể đăng ký</string>
+    <string name="error_logout">Không thể đăng xuất</string>
+    <string name="error_unknown">Lỗi không xác định</string>
+
+    <!-- Validation Messages -->
+    <string name="validation_required">Trường này là bắt buộc</string>
+    <string name="validation_invalid_email">Email không hợp lệ</string>
+    <string name="validation_password_short">Mật khẩu phải có ít nhất 6 ký tự</string>
+    <string name="validation_end_time">Giờ kết thúc phải sau giờ bắt đầu</string>
+    <string name="validation_title_length">Tên sự kiện không được quá 200 ký tự</string>
+    <string name="validation_description_length">Mô tả không được quá 1000 ký tự</string>
+
+    <!-- Reminder Options -->
+    <string name="reminder_5_minutes">5 phút trước</string>
+    <string name="reminder_15_minutes">15 phút trước</string>
+    <string name="reminder_30_minutes">30 phút trước</string>
+    <string name="reminder_1_hour">1 giờ trước</string>
+    <string name="reminder_1_day">1 ngày trước</string>
+
+    <!-- Empty States -->
+    <string name="empty_no_events">Chưa có sự kiện nào</string>
+    <string name="empty_no_tasks">Chưa có nhiệm vụ nào</string>
+    <string name="empty_search_results">Không tìm thấy kết quả</string>
+
+    <!-- Notifications -->
+    <string name="notification_channel_reminders">Nhắc nhở sự kiện</string>
+    <string name="notification_channel_reminders_desc">Thông báo nhắc nhở cho các sự kiện học tập</string>
+    <string name="notification_channel_sync">Đồng bộ dữ liệu</string>
+    <string name="notification_channel_sync_desc">Thông báo đồng bộ dữ liệu với máy chủ</string>
+    <string name="notification_sync_complete">Đồng bộ thành công</string>
+    <string name="notification_sync_error">Lỗi đồng bộ dữ liệu</string>
+    <string name="notification_event_coming">Sắp tới:</string>
+
+    <!-- Date/Time Formats -->
+    <string name="date_format">dd/MM/yyyy</string>
+    <string name="time_format">HH:mm</string>
+    <string name="datetime_format">dd/MM/yyyy HH:mm</string>
+</resources>
