@@ -6,6 +6,8 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import smart.study.planner.data.local.dao.EventDao
 import smart.study.planner.data.local.dao.SubjectDao
+import smart.study.planner.data.local.dao.UserCredentialDao
+import smart.study.planner.data.local.entity.UserCredentialEntity
 import smart.study.planner.data.model.Event
 import smart.study.planner.data.model.Subject
 
@@ -14,13 +16,14 @@ import smart.study.planner.data.model.Subject
  * Manages local data persistence
  */
 @Database(
-    entities = [Event::class, Subject::class],
-    version = 3, // Incremented to add Subject table
+    entities = [Event::class, Subject::class, UserCredentialEntity::class],
+    version = 4, // Incremented to add UserCredentialEntity table
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun eventDao(): EventDao
     abstract fun subjectDao(): SubjectDao
+    abstract fun userCredentialDao(): UserCredentialDao
     
     companion object {
         const val DATABASE_NAME = "ltmobile_database"

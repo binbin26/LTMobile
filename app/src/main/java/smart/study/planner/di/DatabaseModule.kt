@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import smart.study.planner.data.local.dao.EventDao
 import smart.study.planner.data.local.dao.SubjectDao
+import smart.study.planner.data.local.dao.UserCredentialDao
 import smart.study.planner.data.local.database.AppDatabase
 import dagger.Module
 import dagger.Provides
@@ -14,6 +15,8 @@ import javax.inject.Singleton
 
 /**
  * Hilt module for providing database dependencies
+ * Provides Room database and DAOs for dependency injection
+ * Installed in SingletonComponent to ensure single instance throughout app lifecycle
  */
 @Module
 @InstallIn(SingletonComponent::class)
@@ -32,13 +35,21 @@ object DatabaseModule {
     }
     
     @Provides
+    @Singleton
     fun provideEventDao(database: AppDatabase): EventDao {
         return database.eventDao()
     }
     
     @Provides
+    @Singleton
     fun provideSubjectDao(database: AppDatabase): SubjectDao {
         return database.subjectDao()
+    }
+    
+    @Provides
+    @Singleton
+    fun provideUserCredentialDao(database: AppDatabase): UserCredentialDao {
+        return database.userCredentialDao()
     }
 }
 

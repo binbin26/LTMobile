@@ -111,14 +111,44 @@ class AuthRepositoryImpl @Inject constructor(
     }
 
     /**
-     * Reset password
+     * Send password reset email (Forgot Password flow)
+     * Used when user is NOT logged in
+     * Sends email with password reset link
      */
-    override suspend fun resetPassword(email: String): Result<Unit> {
+    override suspend fun sendPasswordResetEmail(email: String): Result<Unit> {
         return withContext(Dispatchers.IO) {
             try {
-                firebaseAuthDataSource.resetPassword(email)
+                firebaseAuthDataSource.sendPasswordResetEmail(email)
             } catch (e: Exception) {
-                Log.e(TAG, "Lỗi đặt lại mật khẩu", e)
+                Log.e(TAG, "Lỗi gửi email đặt lại mật khẩu", e)
+                Result.failure(e)
+            }
+        }
+    }
+
+    /**
+     * Update password for current logged-in user (Change Password flow)
+     */
+    override suspend fun updatePassword(newPassword: String): Result<Unit> {
+        return withContext(Dispatchers.IO) {
+            try {
+                firebaseAuthDataSource.updatePassword(newPassword)
+            } catch (e: Exception) {
+                Log.e(TAG, "Lỗi cập nhật mật khẩu", e)
+                Result.failure(e)
+            }
+        }
+    }
+
+    /**
+     * Complete password reset for forgot password flow
+     */
+    override suspend fun completePasswordReset(email: String, newPassword: String): Result<Unit> {
+        return withContext(Dispatchers.IO) {
+            try {
+                firebaseAuthDataSource.completePasswordReset(email, newPassword)
+            } catch (e: Exception) {
+                Log.e(TAG, "Lỗi hoàn tất reset password", e)
                 Result.failure(e)
             }
         }

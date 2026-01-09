@@ -179,7 +179,10 @@ fun LoginScreen(
                     )
                 }
                 TextButton(
-                    onClick = { /* TODO: Implement forgot password */ }
+                    onClick = {
+                        Log.d(TAG, "Chuyển sang màn hình quên mật khẩu")
+                        navController.navigate(Screen.ForgotPassword.route)
+                    }
                 ) {
                     Text("Quên mật khẩu?", color = MaterialTheme.colorScheme.primary)
                 }

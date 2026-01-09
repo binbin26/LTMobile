@@ -10,12 +10,15 @@ import androidx.navigation.navArgument
 import smart.study.planner.presentation.screens.AddEventScreen
 import smart.study.planner.presentation.screens.CalendarScreen
 import smart.study.planner.presentation.screens.EditProfileScreen
+import smart.study.planner.presentation.screens.ForgotPasswordScreen
 import smart.study.planner.presentation.screens.HomeScreen
 import smart.study.planner.presentation.screens.LoginScreen
 import smart.study.planner.presentation.screens.ProfileScreen
 import smart.study.planner.presentation.screens.RegisterScreen
+import smart.study.planner.presentation.screens.ResetPasswordScreen
 import smart.study.planner.presentation.screens.SplashScreen
 import smart.study.planner.presentation.screens.TaskListScreen
+import smart.study.planner.presentation.screens.VerifyCodeScreen
 
 /**
  * Navigation routes
@@ -25,6 +28,15 @@ sealed class Screen(val route: String) {
     object Splash : Screen("splash")
     object Login : Screen("login")
     object Register : Screen("register")
+    object ForgotPassword : Screen("forgot_password")
+    
+    object VerifyCode : Screen("verify_code/{email}") {
+        fun createRoute(email: String) = "verify_code/$email"
+    }
+    
+    object ResetPassword : Screen("reset_password/{email}") {
+        fun createRoute(email: String) = "reset_password/$email"
+    }
     
     // Chính
     object Home : Screen("home")
@@ -71,6 +83,32 @@ fun NavGraph(navController: NavHostController) {
 
         composable(Screen.Register.route) {
             RegisterScreen(navController = navController)
+        }
+
+        composable(Screen.ForgotPassword.route) {
+            ForgotPasswordScreen(navController = navController)
+        }
+
+        composable(
+            route = Screen.VerifyCode.route,
+            arguments = listOf(navArgument("email") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val email = backStackEntry.arguments?.getString("email") ?: ""
+            VerifyCodeScreen(
+                navController = navController,
+                email = email
+            )
+        }
+
+        composable(
+            route = Screen.ResetPassword.route,
+            arguments = listOf(navArgument("email") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val email = backStackEntry.arguments?.getString("email") ?: ""
+            ResetPasswordScreen(
+                navController = navController,
+                email = email
+            )
         }
 
         // Home screen

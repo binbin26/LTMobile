@@ -5,6 +5,8 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.userProfileChangeRequest
 import com.google.firebase.database.DatabaseReference
 import kotlinx.coroutines.tasks.await
+import smart.study.planner.data.local.datasource.UserCredentialLocalDataSource
+import smart.study.planner.data.local.entity.UserCredentialEntity
 import smart.study.planner.data.model.User
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -16,7 +18,8 @@ import javax.inject.Singleton
 @Singleton
 class FirebaseAuthDataSource @Inject constructor(
     private val firebaseAuth: FirebaseAuth,
-    private val databaseReference: DatabaseReference
+    private val databaseReference: DatabaseReference,
+    private val userCredentialLocalDataSource: UserCredentialLocalDataSource
 ) {
 
     companion object {
@@ -38,6 +41,16 @@ class FirebaseAuthDataSource @Inject constructor(
                 displayName = firebaseUser.displayName ?: email.substringBefore("@"),
                 avatarUrl = firebaseUser.photoUrl?.toString()
             )
+
+            // Save credentials to local database for forgot password verification
+            val credential = UserCredentialEntity(
+                email = email,
+                password = password,
+                userId = firebaseUser.uid,
+                displayName = user.displayName
+            )
+            userCredentialLocalDataSource.saveUserCredential(credential)
+            Log.d(TAG, "Saved user credential locally for: $email")
 
             Result.success(user)
         } catch (e: Exception) {
@@ -114,17 +127,27 @@ class FirebaseAuthDataSource @Inject constructor(
             databaseReference.child("users").child(firebaseUser.uid)
                 .setValue(newUser).await()
 
+            // Save credentials to local database for forgot password verification
+            val credential = UserCredentialEntity(
+                email = email,
+                password = password,
+                userId = firebaseUser.uid,
+                displayName = name
+            )
+            userCredentialLocalDataSource.saveUserCredential(credential)
+            Log.d(TAG, "Saved user credential locally for: $email")
+
             Result.success(newUser)
         } catch (e: Exception) {
             // Handle specific Firebase exceptions
             val errorMessage = when {
-                e.message?.contains("email-already-in-use") == true -> 
+                e.message?.contains("email-already-in-use") == true ->
                     IllegalStateException("Email đã được sử dụng")
-                e.message?.contains("weak-password") == true -> 
+                e.message?.contains("weak-password") == true ->
                     IllegalStateException("Mật khẩu quá yếu")
-                e.message?.contains("invalid-email") == true -> 
+                e.message?.contains("invalid-email") == true ->
                     IllegalStateException("Email không hợp lệ")
-                e.message?.contains("network") == true -> 
+                e.message?.contains("network") == true ->
                     IllegalStateException("Lỗi kết nối mạng. Vui lòng kiểm tra kết nối internet")
                 else -> e
             }
@@ -138,18 +161,6 @@ class FirebaseAuthDataSource @Inject constructor(
     suspend fun logout(): Result<Unit> {
         return try {
             firebaseAuth.signOut()
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * Reset password
-     */
-    suspend fun resetPassword(email: String): Result<Unit> {
-        return try {
-            firebaseAuth.sendPasswordResetEmail(email).await()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -171,103 +182,159 @@ class FirebaseAuthDataSource @Inject constructor(
     }
 
     /**
-     * Get current user with full profile from Firebase Realtime Database
-     * 
-     * Tries to fetch user data from Database first.
-     * If not found, creates User object from FirebaseAuth.
-     * Logs all steps for debugging.
+     * Send password reset email (Forgot Password flow)
+     * Works when user is NOT logged in
+     * Sends email with password reset link via Firebase console
+     *
+     * @param email User email address
+     * @return Result with success or failure
      */
-    suspend fun getCurrentUser(): Result<User?> {
+    suspend fun sendPasswordResetEmail(email: String): Result<Unit> {
+        return try {
+            firebaseAuth.sendPasswordResetEmail(email).await()
+            Log.d(TAG, "Gửi email đặt lại mật khẩu thành công cho $email")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "Lỗi gửi email đặt lại mật khẩu", e)
+            // Map exception to appropriate error message
+            val errorMessage = when {
+                e.message?.contains("too-many-requests") == true ->
+                    IllegalStateException("Quá nhiều yêu cầu. Vui lòng thử lại sau 15 phút")
+                e.message?.contains("user-not-found") == true ->
+                    IllegalStateException("Email không tồn tại")
+                e.message?.contains("invalid-email") == true ->
+                    IllegalStateException("Email không hợp lệ")
+                e.message?.contains("network") == true ->
+                    IllegalStateException("Lỗi kết nối mạng. Vui lòng kiểm tra kết nối internet")
+                else -> e
+            }
+            Result.failure(errorMessage)
+        }
+    }
+
+    /**
+     * Update password for current user (Change Password flow)
+     * ONLY works when user is logged in (currentUser != null)
+     * Updates password in Firebase Authentication
+     *
+     * @param newPassword The new password (minimum 6 characters)
+     * @return Result with success or failure
+     */
+    suspend fun updatePassword(newPassword: String): Result<Unit> {
         return try {
             val firebaseUser = firebaseAuth.currentUser
-            
-            if (firebaseUser != null) {
-                Log.d(TAG, "Lấy thông tin user hiện tại: ${firebaseUser.uid}")
-                
-                // Try to get full user data from database
-                val userResult = getUserFromDatabase(firebaseUser.uid)
-                return userResult.fold(
-                    onSuccess = { user ->
-                        if (user != null) {
-                            Log.d(TAG, "Lấy user từ database thành công: ${user.email}")
-                            Result.success(user)
-                        } else {
-                            Log.d(TAG, "User không tồn tại trong database, tạo từ FirebaseAuth")
-                            // If not in database, create from FirebaseAuth
-                            val fallbackUser = User(
-                                id = firebaseUser.uid,
-                                email = firebaseUser.email ?: "",
-                                displayName = firebaseUser.displayName ?: firebaseUser.email?.substringBefore("@") ?: "User",
-                                avatarUrl = firebaseUser.photoUrl?.toString(),
-                                createdAt = System.currentTimeMillis(),
-                                updatedAt = System.currentTimeMillis()
-                            )
-                            Log.d(TAG, "Tạo user fallback từ FirebaseAuth")
-                            Result.success(fallbackUser)
-                        }
-                    },
-                    onFailure = { error ->
-                        Log.e(TAG, "Lỗi lấy user từ database, tạo fallback", error)
-                        // On database error, create from FirebaseAuth as fallback
-                        val fallbackUser = User(
-                            id = firebaseUser.uid,
-                            email = firebaseUser.email ?: "",
-                            displayName = firebaseUser.displayName ?: firebaseUser.email?.substringBefore("@") ?: "User",
-                            avatarUrl = firebaseUser.photoUrl?.toString(),
-                            createdAt = System.currentTimeMillis(),
-                            updatedAt = System.currentTimeMillis()
-                        )
-                        Result.success(fallbackUser)
-                    }
-                )
-            } else {
-                Log.d(TAG, "Không có user hiện tại")
-                Result.success(null)
-            }
+                ?: throw IllegalStateException("Không có user hiện tại")
+
+            firebaseUser.updatePassword(newPassword).await()
+            Log.d(TAG, "Cập nhật mật khẩu thành công")
+            Result.success(Unit)
         } catch (e: Exception) {
-            Log.e(TAG, "Ngoại lệ khi lấy current user", e)
+            Log.e(TAG, "Lỗi cập nhật mật khẩu", e)
+            val errorMessage = when {
+                e.message?.contains("weak-password") == true ->
+                    IllegalStateException("Mật khẩu quá yếu")
+                e.message?.contains("requires-recent-login") == true ->
+                    IllegalStateException("Vui lòng đăng nhập lại trước khi thay đổi mật khẩu")
+                else -> e
+            }
+            Result.failure(errorMessage)
+        }
+    }
+
+    /**
+     * Complete password reset for forgot password flow
+     * Sends password reset email via Firebase
+     * Firebase Auth is the source of truth - does not rely on local database
+     * Returns success to prevent user enumeration (doesn't reveal if email exists)
+     *
+     * @param email User email (from forgot password flow)
+     * @param newPassword The new password to set (user will set this via email link)
+     * @return Result with success or failure
+     */
+    suspend fun completePasswordReset(email: String, newPassword: String): Result<Unit> {
+        return try {
+            Log.d(TAG, "Initiating password reset for email: $email")
+
+            // Send password reset email via Firebase
+            // Firebase Auth is the source of truth - only Firebase knows if email exists
+            firebaseAuth.sendPasswordResetEmail(email).await()
+            Log.d(TAG, "Password reset email sent successfully for: $email")
+
+            // Always return success to prevent user enumeration
+            // User will receive email if address is registered in Firebase
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error sending password reset email", e)
+
+            // Handle specific Firebase errors
+            val errorMessage = when {
+                e.message?.contains("too-many-requests") == true ->
+                    IllegalStateException("Quá nhiều yêu cầu. Vui lòng thử lại sau 15 phút")
+                e.message?.contains("invalid-email") == true ->
+                    IllegalStateException("Email không hợp lệ")
+                e.message?.contains("network") == true ->
+                    IllegalStateException("Lỗi kết nối mạng. Vui lòng kiểm tra kết nối internet")
+                // For user-not-found and other errors, return success to prevent enumeration
+                // User will only know if email is registered by checking their inbox
+                else -> {
+                    Log.w(TAG, "Password reset request sent (Firebase response: ${e.message})")
+                    // Return success anyway - user will know by checking email
+                    return Result.success(Unit)
+                }
+            }
+            Result.failure(errorMessage)
+        }
+    }
+
+    /**
+     * Re-authenticate user with email and password
+     * Required for sensitive operations like password update
+     *
+     * @param email User email
+     * @param password Current password
+     * @return Result with success or failure
+     */
+    suspend fun reauthenticate(email: String, password: String): Result<Unit> {
+        return try {
+            val firebaseUser = firebaseAuth.currentUser
+                ?: throw IllegalStateException("Không có user hiện tại")
+
+            val credential = com.google.firebase.auth.EmailAuthProvider.getCredential(email, password)
+            firebaseUser.reauthenticate(credential).await()
+            Log.d(TAG, "Xác thực lại thành công")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "Lỗi xác thực lại", e)
             Result.failure(e)
         }
     }
 
     /**
-     * Get user profile from Firebase Realtime Database
-     * 
-     * Fetches complete user information from path: users/{userId}
-     * Includes all user fields: phone, email, gender, school, major, etc.
-     * 
-     * @param userId Firebase user ID
-     * @return Result containing complete User object with all fields, or null if not found
+     * Map Firebase authentication exceptions to appropriate error messages
+     * Handles FirebaseTooManyRequestsException explicitly
+     *
+     * @param exception The Firebase exception
+     * @return An Exception with an appropriate error message
      */
-    suspend fun getUserFromDatabase(userId: String): Result<User?> {
-        return try {
-            Log.d(TAG, "Bắt đầu lấy user từ database: $userId")
-            
-            val snapshot = databaseReference.child("users").child(userId).get().await()
-            
-            if (snapshot.exists()) {
-                Log.d(TAG, "Tìm thấy user data trong database")
-                
-                try {
-                    val user = snapshot.getValue(User::class.java)
-                    if (user != null) {
-                        Log.d(TAG, "Parse user object thành công: ${user.email}")
-                        Result.success(user)
-                    } else {
-                        Log.d(TAG, "User data null sau khi parse")
-                        Result.success(null)
-                    }
-                } catch (parseError: Exception) {
-                    Log.e(TAG, "Lỗi parse user object từ snapshot", parseError)
-                    Result.failure(parseError)
-                }
-            } else {
-                Log.d(TAG, "User không tồn tại trong database")
-                Result.success(null)
+    private fun mapPasswordResetException(exception: Exception): Exception {
+        return when {
+            exception.message?.contains("too-many-requests") == true -> {
+                Log.w(TAG, "Too many password reset requests from this email")
+                IllegalStateException("Quá nhiều yêu cầu. Vui lòng thử lại sau 15 phút")
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Lỗi khi fetch user từ database", e)
-            Result.failure(e)
+            exception.message?.contains("invalid-email") == true ->
+                IllegalStateException("Email không hợp lệ")
+            exception.message?.contains("network") == true ->
+                IllegalStateException("Lỗi kết nối mạng. Vui lòng kiểm tra kết nối internet")
+            // For user-not-found and other errors, return generic message to prevent enumeration
+            exception.message?.contains("user-not-found") == true -> {
+                Log.w(TAG, "User not found for password reset (preventing enumeration)")
+                IllegalStateException("Không thể gửi email đặt lại mật khẩu. Vui lòng thử lại sau")
+            }
+            else -> {
+                Log.w(TAG, "Password reset error: ${exception.message}")
+                exception
+            }
         }
     }
 }

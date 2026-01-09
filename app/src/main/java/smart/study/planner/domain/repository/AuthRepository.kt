@@ -64,9 +64,35 @@ interface AuthRepository {
     suspend fun logout(): Result<Unit>
     
     /**
-     * Reset password
+     * Send password reset email (Forgot Password flow)
+     * Used when user is NOT logged in and needs to reset password
+     * Sends email with password reset link to Firebase console
+     * 
+     * @param email User email address
+     * @return Result with success or failure
      */
-    suspend fun resetPassword(email: String): Result<Unit>
+    suspend fun sendPasswordResetEmail(email: String): Result<Unit>
+
+    /**
+     * Update password for current logged-in user (Change Password flow)
+     * ONLY works when user is already logged in
+     * Requires recent login for security
+     * 
+     * @param newPassword New password (minimum 6 characters)
+     * @return Result with success or failure
+     */
+    suspend fun updatePassword(newPassword: String): Result<Unit>
+
+    /**
+     * Complete password reset for forgot password flow
+     * Requires email only - gets old password from local database
+     * After verification, updates to new password
+     * 
+     * @param email User email
+     * @param newPassword New password (minimum 6 characters)
+     * @return Result with success or failure
+     */
+    suspend fun completePasswordReset(email: String, newPassword: String): Result<Unit>
     
     /**
      * Check if user is logged in

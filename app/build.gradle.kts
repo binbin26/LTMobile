@@ -76,6 +76,7 @@ dependencies {
     // Room Database
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
+    implementation(libs.firebase.database)
     ksp(libs.room.compiler)
     
     // Hilt Dependency Injection
@@ -94,6 +95,8 @@ dependencies {
     implementation(libs.firebase.storage.ktx)
     implementation(libs.firebase.perf.ktx)
     implementation(libs.firebase.firestore.ktx)
+    implementation(libs.firebase.app.check)
+    debugImplementation(libs.firebase.app.check.debug)
     
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)

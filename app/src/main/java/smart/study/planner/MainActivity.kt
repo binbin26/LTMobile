@@ -38,13 +38,7 @@ class MainActivity : ComponentActivity() {
                     val navController = rememberNavController()
                     val showOverlay by DebugOverlayManager.showOverlay.collectAsState()
 
-                    Scaffold(
-                        floatingActionButton = {
-                            FloatingActionButton(onClick = { DebugOverlayManager.toggle() }) {
-                                Icon(Icons.Default.BugReport, contentDescription = "Toggle Debug Overlay")
-                            }
-                        }
-                    ) { innerPadding ->
+                    Scaffold() { innerPadding ->
                         Box(modifier = Modifier.padding(innerPadding)) {
                             NavGraph(navController = navController)
                             if (showOverlay) {
