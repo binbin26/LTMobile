@@ -76,5 +76,12 @@ interface EventDao {
      */
     @Query("UPDATE events SET isSynced = 1 WHERE id IN (:ids)")
     suspend fun markAsSynced(ids: List<String>)
+    
+    /**
+     * Get all events synchronously (for sync operations that need immediate access)
+     * ✅ CRITICAL: Used in syncWithFirebase to compare timestamps
+     */
+    @Query("SELECT * FROM events ORDER BY startDateTime ASC")
+    suspend fun getAllEventsSync(): List<Event>
 }
 

@@ -7,6 +7,15 @@ import smart.study.planner.data.model.Subject
 /**
  * Data Transfer Object for Firebase Realtime Database
  * Used for serialization/deserialization with Firebase
+ *
+ * Updated to include new subject management fields:
+ * - teacherName: Instructor name
+ * - schedule: Class schedule
+ * - classroom: Room/location
+ * - credits: Number of credits
+ * - semester: Academic semester
+ * - description: Additional notes
+ * - updatedAt: Last update timestamp
  */
 @IgnoreExtraProperties
 data class SubjectDto(
@@ -14,10 +23,21 @@ data class SubjectDto(
     val userId: String = "",
     val name: String = "",
     val colorHex: String = "#4285F4",
-    val createdAt: Long = System.currentTimeMillis()
+
+    // 🆕 New fields for enhanced subject management
+    val teacherName: String = "",
+    val schedule: String = "",
+    val classroom: String = "",
+    val credits: Int = 0,
+    val semester: String = "",
+    val description: String = "",
+
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
 ) {
     /**
      * Convert to Map for Firebase, excluding null values
+     * All fields are included for complete sync
      */
     @Exclude
     fun toMap(): Map<String, Any> {
@@ -26,10 +46,17 @@ data class SubjectDto(
             "userId" to userId,
             "name" to name,
             "colorHex" to colorHex,
-            "createdAt" to createdAt
+            "teacherName" to teacherName,
+            "schedule" to schedule,
+            "classroom" to classroom,
+            "credits" to credits,
+            "semester" to semester,
+            "description" to description,
+            "createdAt" to createdAt,
+            "updatedAt" to updatedAt
         )
     }
-    
+
     /**
      * Convert DTO to domain model
      */
@@ -39,10 +66,17 @@ data class SubjectDto(
             userId = userId,
             name = name,
             colorHex = colorHex,
-            createdAt = createdAt
+            teacherName = teacherName,
+            schedule = schedule,
+            classroom = classroom,
+            credits = credits,
+            semester = semester,
+            description = description,
+            createdAt = createdAt,
+            updatedAt = updatedAt
         )
     }
-    
+
     companion object {
         /**
          * Convert domain model to DTO
@@ -53,7 +87,14 @@ data class SubjectDto(
                 userId = subject.userId,
                 name = subject.name,
                 colorHex = subject.colorHex,
-                createdAt = subject.createdAt
+                teacherName = subject.teacherName,
+                schedule = subject.schedule,
+                classroom = subject.classroom,
+                credits = subject.credits,
+                semester = subject.semester,
+                description = subject.description,
+                createdAt = subject.createdAt,
+                updatedAt = subject.updatedAt
             )
         }
     }

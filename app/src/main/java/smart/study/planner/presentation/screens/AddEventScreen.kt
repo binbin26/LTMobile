@@ -18,7 +18,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CalendarToday
-import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Title
@@ -38,12 +37,10 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -68,7 +65,6 @@ import smart.study.planner.presentation.navigation.Screen
 import smart.study.planner.presentation.util.UiState
 import smart.study.planner.presentation.viewmodel.EventViewModel
 import smart.study.planner.presentation.viewmodel.SubjectViewModel
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -87,12 +83,27 @@ fun AddEventScreen(
     viewModel: EventViewModel = hiltViewModel(),
     subjectViewModel: SubjectViewModel = hiltViewModel()
 ) {
+    // ✅ Filter placeholder eventId and validate UUID format
+    val actualEventId = remember(eventId) {
+        if (eventId.isNullOrBlank() || eventId == "{eventId}") {
+            null
+        } else {
+            // Validate UUID format to avoid malformed IDs from navigation
+            val uuidRegex = Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+            if (!uuidRegex.matches(eventId)) {
+                Log.e(TAG, "Invalid eventId format received: $eventId")
+                null
+            } else {
+                eventId
+            }
+        }
+    }
+    
     Log.d(TAG, "============================================")
     Log.d(TAG, "AddEventScreen opened")
     Log.d(TAG, "Received eventId parameter: $eventId")
-    Log.d(TAG, "Is null: ${eventId == null}")
-    Log.d(TAG, "Is empty: ${eventId?.isEmpty()}")
-    Log.d(TAG, "Mode: ${if (eventId == null || eventId.isEmpty()) "CREATE NEW" else "EDIT EXISTING"}")
+    Log.d(TAG, "Actual eventId after filtering: $actualEventId")
+    Log.d(TAG, "Mode: ${if (actualEventId == null) "CREATE NEW" else "EDIT EXISTING"}")
     Log.d(TAG, "============================================")
 
     var title by rememberSaveable { mutableStateOf("") }
@@ -127,21 +138,28 @@ fun AddEventScreen(
     val eventsState by viewModel.eventsState.collectAsStateWithLifecycle()
 
     var showError by rememberSaveable { mutableStateOf("") }
-    var isEditMode by remember { mutableStateOf(eventId != null && eventId.isNotEmpty()) }
+    var isEditMode by remember { mutableStateOf(actualEventId != null) }
+    
+    // ✅ Lưu original event để preserve createdAt và các fields khác khi edit
+    var originalEvent by remember { mutableStateOf<Event?>(null) }
 
-    LaunchedEffect(eventId) {
-        if (eventId != null && eventId.isNotEmpty()) {
-            Log.d(TAG, "Loading event for edit: $eventId")
+    // Subjects will auto-load via ViewModel's init block
+    // which calls refreshFromFirebase()
+
+    LaunchedEffect(actualEventId) {
+        if (actualEventId != null && actualEventId.isNotEmpty()) {
+            Log.d(TAG, "Loading event for edit: $actualEventId")
             isEditMode = true
             viewModel.loadEvents()
         }
     }
 
-    LaunchedEffect(eventsState, eventId, subjectsState) {
-        if (eventId != null && eventId.isNotEmpty() && eventsState is UiState.Success) {
-            val event = (eventsState as UiState.Success<List<Event>>).data.find { it.id == eventId }
+    LaunchedEffect(eventsState, actualEventId, subjectsState) {
+        if (actualEventId != null && actualEventId.isNotEmpty() && eventsState is UiState.Success) {
+            val event = (eventsState as UiState.Success<List<Event>>).data.find { it.id == actualEventId }
             if (event != null) {
                 Log.d(TAG, "Event found for editing: ${event.title}")
+                originalEvent = event // ✅ Lưu original event
                 title = event.title
                 description = event.description
                 selectedCategory = event.category
@@ -153,16 +171,29 @@ fun AddEventScreen(
                     subjectInput = it
                 }
             } else {
-                Log.w(TAG, "Event not found: $eventId")
+                Log.w(TAG, "Event not found: $actualEventId")
             }
         }
     }
 
+    // Filter subjects based on input
     LaunchedEffect(subjectInput, subjectsState) {
+        Log.d(TAG, "Filtering subjects. Input: '$subjectInput', Total subjects: ${subjectsState.size}")
         if (subjectInput.isBlank()) {
             filteredSubjects = subjectsState.take(10)
         } else {
+            // searchSubjects is suspend function, need to call in coroutine
             filteredSubjects = subjectViewModel.searchSubjects(subjectInput)
+        }
+        Log.d(TAG, "Filtered subjects count: ${filteredSubjects.size}")
+    }
+
+    // Debug subjects state
+    LaunchedEffect(subjectsState) {
+        Log.d(TAG, "=== SUBJECTS STATE UPDATED ===")
+        Log.d(TAG, "Total subjects: ${subjectsState.size}")
+        subjectsState.forEach { subject ->
+            Log.d(TAG, "Subject: ${subject.name} (ID: ${subject.id})")
         }
     }
 
@@ -187,7 +218,7 @@ fun AddEventScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = if (eventId == null) "Tạo Task Mới" else "Chỉnh Sửa Task",
+                        text = if (actualEventId == null) "Tạo Task Mới" else "Chỉnh Sửa Task",
                         color = Color.White,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -213,7 +244,7 @@ fun AddEventScreen(
                     when (route) {
                         Screen.Home.route -> navController.navigate(route)
                         Screen.Calendar.route -> navController.navigate(route)
-                        Screen.TaskList.route -> navController.navigate(route)
+                        Screen.Tasks.route -> navController.navigate(route)
                         Screen.Profile.route -> navController.navigate(route)
                         else -> {}
                     }
@@ -283,7 +314,7 @@ fun AddEventScreen(
                 }
             }
 
-            // Subject Section - IMPROVED
+            // Subject Section - FIXED
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
@@ -316,53 +347,102 @@ fun AddEventScreen(
 
                     Box(modifier = Modifier.fillMaxWidth()) {
                         OutlinedTextField(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { subjectDropdownExpanded = true },
+                            modifier = Modifier.fillMaxWidth(),
                             value = subjectInput,
                             onValueChange = { newValue ->
                                 subjectInput = newValue
-                                subjectDropdownExpanded = true
                                 selectedSubjectId = null
+                                // Chỉ mở dropdown khi user đang gõ
+                                if (newValue.isNotBlank()) {
+                                    subjectDropdownExpanded = true
+                                }
                             },
-                            placeholder = { Text("Chọn hoặc thêm môn học...") },
+                            placeholder = { Text("Nhập tên môn học...") },
                             trailingIcon = {
-                                Icon(
-                                    imageVector = Icons.Default.ArrowDropDown,
-                                    contentDescription = "Dropdown",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                IconButton(
+                                    onClick = {
+                                        subjectDropdownExpanded = !subjectDropdownExpanded
+                                        Log.d(TAG, "Dropdown toggled: $subjectDropdownExpanded")
+                                        Log.d(TAG, "Filtered subjects: ${filteredSubjects.size}")
+                                        Log.d(TAG, "All subjects: ${subjectsState.size}")
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowDropDown,
+                                        contentDescription = "Dropdown",
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             },
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = MaterialTheme.colorScheme.primary,
                                 unfocusedBorderColor = MaterialTheme.colorScheme.outline
                             ),
-                            shape = RoundedCornerShape(12.dp),
-                            enabled = true
+                            shape = RoundedCornerShape(12.dp)
                         )
 
                         DropdownMenu(
-                            expanded = subjectDropdownExpanded && (filteredSubjects.isNotEmpty() || subjectInput.isNotBlank()),
-                            onDismissRequest = { subjectDropdownExpanded = false },
+                            expanded = subjectDropdownExpanded,
+                            onDismissRequest = {
+                                subjectDropdownExpanded = false
+                                Log.d(TAG, "Dropdown dismissed")
+                            },
                             modifier = Modifier
                                 .fillMaxWidth(0.9f)
                                 .background(MaterialTheme.colorScheme.surface)
                         ) {
-                            // Existing subjects
-                            filteredSubjects.forEach { subject ->
+                            // Show loading message if subjects not loaded yet
+                            if (subjectsState.isEmpty() && subjectInput.isBlank()) {
                                 DropdownMenuItem(
-                                    text = { Text(subject.name) },
-                                    onClick = {
-                                        selectedSubjectId = subject.id
-                                        subjectInput = subject.name
-                                        subjectDropdownExpanded = false
-                                    }
+                                    text = {
+                                        Row(
+                                            horizontalArrangement = Arrangement.Center,
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(20.dp),
+                                                strokeWidth = 2.dp
+                                            )
+                                            Spacer(modifier = Modifier.padding(4.dp))
+                                            Text("Đang tải môn học...")
+                                        }
+                                    },
+                                    onClick = { }
                                 )
                             }
 
-                            // Add new subject option - ONLY if no exact match
+                            // Existing subjects
+                            if (filteredSubjects.isNotEmpty()) {
+                                filteredSubjects.forEach { subject ->
+                                    DropdownMenuItem(
+                                        text = { Text(subject.name) },
+                                        onClick = {
+                                            selectedSubjectId = subject.id
+                                            subjectInput = subject.name
+                                            subjectDropdownExpanded = false
+                                            Log.d(TAG, "Subject selected: ${subject.name}")
+                                        }
+                                    )
+                                }
+                            } else if (subjectInput.isBlank() && subjectsState.isNotEmpty()) {
+                                // Show all subjects when no filter
+                                subjectsState.take(10).forEach { subject ->
+                                    DropdownMenuItem(
+                                        text = { Text(subject.name) },
+                                        onClick = {
+                                            selectedSubjectId = subject.id
+                                            subjectInput = subject.name
+                                            subjectDropdownExpanded = false
+                                            Log.d(TAG, "Subject selected: ${subject.name}")
+                                        }
+                                    )
+                                }
+                            }
+
+                            // Add new subject option - ONLY if user has typed something
                             if (subjectInput.isNotBlank() &&
-                                filteredSubjects.none { it.name.equals(subjectInput, ignoreCase = true) }) {
+                                filteredSubjects.none { it.name.equals(subjectInput, ignoreCase = true) }
+                            ) {
                                 DropdownMenuItem(
                                     text = {
                                         Row(
@@ -386,9 +466,11 @@ fun AddEventScreen(
                                     },
                                     onClick = {
                                         coroutineScope.launch {
+                                            Log.d(TAG, "Adding new subject: $subjectInput")
                                             val result = subjectViewModel.addSubject(subjectInput)
                                             result.fold(
                                                 onSuccess = { subject ->
+                                                    Log.d(TAG, "Subject added successfully: ${subject.name}")
                                                     selectedSubjectId = subject.id
                                                     subjectInput = subject.name
                                                     subjectDropdownExpanded = false
@@ -399,6 +481,22 @@ fun AddEventScreen(
                                             )
                                         }
                                     }
+                                )
+                            }
+
+                            // Show "No results" message
+                            if (subjectInput.isNotBlank() &&
+                                filteredSubjects.isEmpty() &&
+                                subjectsState.isNotEmpty()) {
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            "Không tìm thấy môn học phù hợp",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    },
+                                    onClick = { }
                                 )
                             }
                         }
@@ -544,9 +642,7 @@ fun AddEventScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         CircularProgressIndicator(
-                            modifier = Modifier
-                                .size(24.dp)
-                                .padding(end = 8.dp),
+                            modifier = Modifier.size(24.dp),
                             color = MaterialTheme.colorScheme.primary
                         )
                         Spacer(modifier = Modifier.padding(4.dp))
@@ -617,36 +713,80 @@ fun AddEventScreen(
 
                         showError = ""
 
-                        val isCreatingNew = eventId == null || eventId.isEmpty()
+                        val isCreatingNew = actualEventId == null || actualEventId.isEmpty()
                         val finalEventId = if (isCreatingNew) {
                             UUID.randomUUID().toString()
                         } else {
-                            eventId
+                            actualEventId
                         }
 
                         Log.d(TAG, "Is creating new: $isCreatingNew, Final Event ID: $finalEventId")
 
-                        val event = Event(
-                            id = finalEventId,
-                            userId = currentUserId,
-                            title = title.trim(),
-                            description = description.trim(),
-                            startDateTime = selectedDate,
-                            endDateTime = null,
-                            location = "",
-                            category = selectedCategory,
-                            priority = smart.study.planner.data.model.EventPriority.MEDIUM,
-                            isCompleted = false,
-                            isAllDay = false,
-                            reminderEnabled = false,
-                            reminderMinutes = 15,
-                            colorHex = "#4285F4",
-                            isSynced = true,
-                            createdAt = System.currentTimeMillis(),
-                            updatedAt = System.currentTimeMillis(),
-                            subjectId = selectedSubject?.id,
-                            subjectName = selectedSubject?.name
-                        )
+                        // ✅ Preserve original event fields when editing
+                        val event = if (isCreatingNew) {
+                            // Create new event
+                            Event(
+                                id = finalEventId,
+                                userId = currentUserId,
+                                title = title.trim(),
+                                description = description.trim(),
+                                startDateTime = selectedDate,
+                                endDateTime = null,
+                                location = "",
+                                category = selectedCategory,
+                                priority = smart.study.planner.data.model.EventPriority.MEDIUM,
+                                isCompleted = false,
+                                isAllDay = false,
+                                reminderEnabled = false,
+                                reminderMinutes = 15,
+                                colorHex = "#4285F4",
+                                isSynced = true,
+                                createdAt = System.currentTimeMillis(),
+                                updatedAt = System.currentTimeMillis(),
+                                subjectId = selectedSubject?.id,
+                                subjectName = selectedSubject?.name
+                            )
+                        } else {
+                            // Update existing event - preserve createdAt and other fields
+                            val original = originalEvent
+                            if (original != null) {
+                                original.copy(
+                                    id = finalEventId, // Keep original ID
+                                    title = title.trim(),
+                                    description = description.trim(),
+                                    startDateTime = selectedDate,
+                                    category = selectedCategory,
+                                    updatedAt = System.currentTimeMillis(), // Update timestamp
+                                    subjectId = selectedSubject?.id,
+                                    subjectName = selectedSubject?.name,
+                                    // Preserve: createdAt, userId, priority, isCompleted, etc.
+                                )
+                            } else {
+                                // Fallback if original event not loaded
+                                Log.w(TAG, "Original event not found, creating new event instead")
+                                Event(
+                                    id = finalEventId,
+                                    userId = currentUserId,
+                                    title = title.trim(),
+                                    description = description.trim(),
+                                    startDateTime = selectedDate,
+                                    endDateTime = null,
+                                    location = "",
+                                    category = selectedCategory,
+                                    priority = smart.study.planner.data.model.EventPriority.MEDIUM,
+                                    isCompleted = false,
+                                    isAllDay = false,
+                                    reminderEnabled = false,
+                                    reminderMinutes = 15,
+                                    colorHex = "#4285F4",
+                                    isSynced = true,
+                                    createdAt = System.currentTimeMillis(),
+                                    updatedAt = System.currentTimeMillis(),
+                                    subjectId = selectedSubject?.id,
+                                    subjectName = selectedSubject?.name
+                                )
+                            }
+                        }
 
                         Log.d(TAG, """
                             Preparing to ${if (isCreatingNew) "CREATE" else "UPDATE"} event:
@@ -655,13 +795,14 @@ fun AddEventScreen(
                             - Title: ${event.title}
                             - Start Date: ${event.startDateTime}
                             - Category: ${event.category}
+                            - Subject: ${event.subjectName ?: "None"}
                         """.trimIndent())
 
                         if (isCreatingNew) {
                             Log.d(TAG, "Calling saveEvent for new event")
                             viewModel.saveEvent(event)
                         } else {
-                            Log.d(TAG, "Calling updateEvent for existing event: $eventId")
+                            Log.d(TAG, "Calling updateEvent for existing event: $actualEventId")
                             viewModel.updateEvent(event)
                         }
                     },
@@ -671,7 +812,7 @@ fun AddEventScreen(
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Text(
-                        text = if (eventId == null) "💾 Lưu Task" else "✏️ Cập Nhật",
+                        text = if (actualEventId == null) "💾 Lưu Task" else "✏️ Cập Nhật",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -698,7 +839,7 @@ fun AddEventScreen(
                             .height(48.dp),
                         onClick = {
                             Log.d(TAG, "Navigate to task list")
-                            navController.navigate(Screen.TaskList.route)
+                            navController.navigate(Screen.Tasks.route)
                         },
                         enabled = saveState !is UiState.Loading && updateState !is UiState.Loading,
                         shape = RoundedCornerShape(12.dp)

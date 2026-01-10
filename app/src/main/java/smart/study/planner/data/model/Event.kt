@@ -2,19 +2,25 @@ package smart.study.planner.data.model
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import com.google.firebase.database.IgnoreExtraProperties
 import java.util.UUID
 
 /**
  * Domain model for Event
  * Represents a study event/task in the application
+ * 
+ * Note: This class has no-argument constructor with default values to support
+ * Firebase deserialization. All fields have default values to ensure Firebase
+ * can properly deserialize events from the database.
  */
+@IgnoreExtraProperties
 @Entity(tableName = "events")
 data class Event(
     @PrimaryKey val id: String = UUID.randomUUID().toString(),
     val userId: String = "",
-    val title: String,
+    val title: String = "",
     val description: String = "",
-    val startDateTime: Long, // timestamp in milliseconds
+    val startDateTime: Long = System.currentTimeMillis(), // timestamp in milliseconds
     val endDateTime: Long? = null, // optional end timestamp
     val location: String = "",
     val category: EventCategory = EventCategory.STUDY,

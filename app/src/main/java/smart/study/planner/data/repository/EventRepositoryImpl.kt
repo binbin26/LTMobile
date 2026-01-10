@@ -6,6 +6,7 @@ import com.google.firebase.database.FirebaseDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
@@ -33,10 +34,29 @@ class EventRepositoryImpl @Inject constructor(
     }
 
     override fun getAllEvents(): Flow<Result<List<Event>>> {
-        return eventDao.getAllEvents()
-            .map { events -> Result.success(events.filter { it.userId == firebaseAuth.currentUser?.uid }) }
-            .catch { e -> emit(Result.failure(e)) }
-            .flowOn(Dispatchers.IO)
+        return flow {
+            // ✅ BƯỚC 1: Sync từ Firebase trước
+            Log.d(TAG, "🔄 [getAllEvents] Syncing events from Firebase to Local...")
+            try {
+                syncWithFirebase().getOrThrow()
+                Log.d(TAG, "✅ [getAllEvents] Firebase sync completed")
+            } catch (e: Exception) {
+                Log.e(TAG, "⚠️ [getAllEvents] Firebase sync failed: ${e.message}, using local data only", e)
+            }
+            
+            // ✅ BƯỚC 2: Sau đó emit local data
+            eventDao.getAllEvents()
+                .map { events -> 
+                    val userEvents = events.filter { it.userId == firebaseAuth.currentUser?.uid }
+                    Log.d(TAG, "📊 [getAllEvents] Loaded ${userEvents.size} events from local (total: ${events.size})")
+                    Result.success(userEvents)
+                }
+                .catch { e -> 
+                    Log.e(TAG, "❌ [getAllEvents] Error loading from local: ${e.message}", e)
+                    emit(Result.failure(e)) 
+                }
+                .collect { emit(it) }
+        }.flowOn(Dispatchers.IO)
     }
 
     override fun getEventsByDateRange(startDate: Long, endDate: Long): Flow<Result<List<Event>>> {
@@ -55,12 +75,31 @@ class EventRepositoryImpl @Inject constructor(
     }
 
     override fun getUpcomingEvents(days: Int): Flow<Result<List<Event>>> {
-        val currentTime = System.currentTimeMillis()
-        val endTime = currentTime + (days * 24 * 60 * 60 * 1000L)
-        return eventDao.getEventsByDateRange(currentTime, endTime)
-            .map { events -> Result.success(events.filter { !it.isCompleted && it.userId == firebaseAuth.currentUser?.uid }) }
-            .catch { e -> emit(Result.failure(e)) }
-            .flowOn(Dispatchers.IO)
+        return flow {
+            // ✅ Sync Firebase trước
+            Log.d(TAG, "🔄 [getUpcomingEvents] Syncing events from Firebase...")
+            try {
+                syncWithFirebase().getOrThrow()
+                Log.d(TAG, "✅ [getUpcomingEvents] Firebase sync completed")
+            } catch (e: Exception) {
+                Log.e(TAG, "⚠️ [getUpcomingEvents] Sync failed: ${e.message}, using local data only", e)
+            }
+            
+            val currentTime = System.currentTimeMillis()
+            val endTime = currentTime + (days * 24 * 60 * 60 * 1000L)
+            
+            eventDao.getEventsByDateRange(currentTime, endTime)
+                .map { events -> 
+                    val filtered = events.filter { !it.isCompleted && it.userId == firebaseAuth.currentUser?.uid }
+                    Log.d(TAG, "📊 [getUpcomingEvents] Loaded ${filtered.size} upcoming events")
+                    Result.success(filtered)
+                }
+                .catch { e -> 
+                    Log.e(TAG, "❌ [getUpcomingEvents] Error loading: ${e.message}", e)
+                    emit(Result.failure(e)) 
+                }
+                .collect { emit(it) }
+        }.flowOn(Dispatchers.IO)
     }
 
     override fun getTodayEvents(): Flow<Result<List<Event>>> {
@@ -155,16 +194,49 @@ class EventRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun toggleEventCompletion(eventId: String): Result<Unit> = withContext(Dispatchers.IO) {
+    override suspend fun toggleEventCompletion(eventId: String): Result<Event> = withContext(Dispatchers.IO) {
         try {
             val event = eventDao.getEventById(eventId)
-            if (event != null) {
-                val updatedEvent = event.copy(isCompleted = !event.isCompleted, isSynced = false)
-                eventDao.updateEvent(updatedEvent)
-                syncEventToFirebase(updatedEvent).getOrThrow()
+                ?: return@withContext Result.failure(Exception("Event not found: $eventId"))
+            
+            Log.d(TAG, "🔄 BEFORE Room update: eventId=$eventId, isCompleted=${event.isCompleted}")
+            
+            // ✅ CRITICAL: Update Room Database FIRST (synchronous, immediate)
+            val updatedEvent = event.copy(
+                isCompleted = !event.isCompleted,
+                updatedAt = System.currentTimeMillis(),
+                isSynced = false
+            )
+            eventDao.updateEvent(updatedEvent)
+            
+            Log.d(TAG, "✅ AFTER Room update: eventId=$eventId, isCompleted=${updatedEvent.isCompleted}")
+            
+            // ✅ VERIFY: Confirm Room was actually updated
+            val verifyEvent = eventDao.getEventById(eventId)
+            Log.d(TAG, "✅ VERIFY from Room: eventId=$eventId, isCompleted=${verifyEvent?.isCompleted}")
+            
+            if (verifyEvent?.isCompleted != updatedEvent.isCompleted) {
+                Log.e(TAG, "❌ CRITICAL: Room update verification failed! Expected: ${updatedEvent.isCompleted}, Got: ${verifyEvent?.isCompleted}")
+                return@withContext Result.failure(Exception("Room update verification failed"))
             }
-            Result.success(Unit)
+            
+            // ✅ THEN sync to Firebase in background (non-blocking, async)
+            // This happens on IO dispatcher - doesn't block the caller
+            try {
+                Log.d(TAG, "🔄 Syncing to Firebase: eventId=$eventId, isCompleted=${updatedEvent.isCompleted}")
+                syncEventToFirebase(updatedEvent).getOrThrow()
+                
+                Log.d(TAG, "✅ Firebase synced: eventId=$eventId")
+            } catch (e: Exception) {
+                Log.e(TAG, "⚠️ Firebase sync failed (will retry later): ${e.message}")
+                // Don't fail the operation - Room is updated, sync will happen later via syncPendingEvents()
+            }
+            
+            // ✅ Return the updated event to caller for verification
+            Result.success(updatedEvent)
+            
         } catch (e: Exception) {
+            Log.e(TAG, "❌ Toggle failed: ${e.message}", e)
             Result.failure(e)
         }
     }
@@ -199,17 +271,81 @@ class EventRepositoryImpl @Inject constructor(
         val userId = firebaseAuth.currentUser?.uid ?: return Result.failure(Exception("User not logged in"))
         return withContext(Dispatchers.IO) {
             try {
+                Log.d(TAG, "🔄 [syncWithFirebase] Starting Firebase sync for user: $userId")
+                
+                // ✅ STEP 1: Get all events from Firebase
                 val firebaseEvents = getEventsFromFirebase(userId).getOrThrow()
-                eventDao.getAllEvents().collect { localEvents ->
-                    val eventsToDelete = localEvents.filter { it.userId == userId }
-                    eventsToDelete.forEach { eventDao.deleteEvent(it) }
+                Log.d(TAG, "📥 [syncWithFirebase] Fetched ${firebaseEvents.size} events from Firebase")
+                
+                // ✅ STEP 2: Get all local events synchronously (using getAllEventsSync)
+                val allLocalEvents = eventDao.getAllEventsSync()
+                val userLocalEvents = allLocalEvents.filter { it.userId == userId }
+                Log.d(TAG, "📦 [syncWithFirebase] Loaded ${userLocalEvents.size} local events")
+                
+                val roomEventsMap = userLocalEvents.associateBy { it.id }
+                
+                var updatedCount = 0
+                var skippedCount = 0
+                var addedCount = 0
+                
+                // ✅ STEP 3: Compare Firebase events with Room events using timestamps
+                firebaseEvents.forEach { firebaseEvent ->
+                    val roomEvent = roomEventsMap[firebaseEvent.id]
+                    
+                    if (roomEvent == null) {
+                        // ✅ NEW EVENT: Add to Room
+                        Log.d(TAG, "➕ [syncWithFirebase] Adding new event from Firebase: ${firebaseEvent.title} (ID: ${firebaseEvent.id})")
+                        eventDao.insertEvent(firebaseEvent)
+                        addedCount++
+                        
+                    } else {
+                        // ✅ EVENT EXISTS: Compare timestamps to determine which is newer
+                        val firebaseTime = firebaseEvent.updatedAt
+                        val roomTime = roomEvent.updatedAt
+                        
+                        when {
+                            firebaseTime > roomTime -> {
+                                // ✅ FIREBASE IS NEWER: Update Room with Firebase data
+                                Log.d(TAG, "⬇️ [syncWithFirebase] Firebase is newer: ${firebaseEvent.title}")
+                                Log.d(TAG, "   Firebase time: $firebaseTime, Room time: $roomTime")
+                                Log.d(TAG, "   Firebase isCompleted: ${firebaseEvent.isCompleted}, Room isCompleted: ${roomEvent.isCompleted}")
+                                eventDao.updateEvent(firebaseEvent)
+                                updatedCount++
+                            }
+                            
+                            roomTime > firebaseTime -> {
+                                // ✅ ROOM IS NEWER: DO NOT UPDATE (keep Room data as source of truth)
+                                Log.d(TAG, "⏭️ [syncWithFirebase] Room is NEWER - skipping Firebase version: ${roomEvent.title}")
+                                Log.d(TAG, "   Firebase time: $firebaseTime, Room time: $roomTime")
+                                Log.d(TAG, "   Firebase isCompleted: ${firebaseEvent.isCompleted}, Room isCompleted: ${roomEvent.isCompleted}")
+                                skippedCount++
+                                
+                                // ✅ CRITICAL: If Room data is not synced yet, push it to Firebase
+                                if (!roomEvent.isSynced) {
+                                    Log.d(TAG, "🔄 [syncWithFirebase] Pushing unsync'd Room data to Firebase: ${roomEvent.title}")
+                                    try {
+                                        syncEventToFirebase(roomEvent).getOrThrow()
+                                        Log.d(TAG, "✅ [syncWithFirebase] Pushed Room data to Firebase successfully")
+                                    } catch (e: Exception) {
+                                        Log.e(TAG, "⚠️ [syncWithFirebase] Failed to push Room data to Firebase: ${e.message}")
+                                    }
+                                }
+                            }
+                            
+                            else -> {
+                                // Same timestamp - do nothing
+                                Log.d(TAG, "⏭️ [syncWithFirebase] Same timestamp - skipping: ${roomEvent.title}")
+                                skippedCount++
+                            }
+                        }
+                    }
                 }
-                firebaseEvents.forEach { event ->
-                    eventDao.insertEvent(event)
-                }
+                
+                Log.d(TAG, "✅ [syncWithFirebase] Completed: Added=$addedCount, Updated=$updatedCount, Skipped=$skippedCount")
                 Result.success(Unit)
+                
             } catch (e: Exception) {
-                Log.e(TAG, "Error in syncFromFirebase: ${e.message}", e)
+                Log.e(TAG, "❌ [syncWithFirebase] Failed: ${e.message}", e)
                 Result.failure(e)
             }
         }

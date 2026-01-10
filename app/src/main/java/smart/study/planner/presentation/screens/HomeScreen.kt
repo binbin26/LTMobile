@@ -2,6 +2,7 @@ package smart.study.planner.presentation.screens
 
 import android.util.Log
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,12 +17,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -131,7 +136,8 @@ fun HomeScreen(
         when (val state = eventsState) {
             is UiState.Success -> {
                 val events = state.data
-                val urgentCount = events.count {                    !it.isCompleted && it.startDateTime <= System.currentTimeMillis() + 24 * 60 * 60 * 1000
+                val urgentCount = events.count {
+                    !it.isCompleted && it.startDateTime <= System.currentTimeMillis() + 24 * 60 * 60 * 1000
                 }
                 val completedCount = events.count { it.isCompleted }
                 val totalCount = events.size
@@ -187,7 +193,7 @@ fun HomeScreen(
                     when (route) {
                         Screen.AddEvent.route,
                         Screen.Calendar.route,
-                        Screen.TaskList.route,
+                        Screen.Tasks.route,
                         Screen.Profile.route -> {
                             if (route == Screen.Profile.route) {
                                 Log.d(TAG, "Profile nav click from BottomNavigationBar")
@@ -251,8 +257,75 @@ fun HomeScreen(
             ) {
                 Spacer(modifier = Modifier.height(20.dp))
 
+                // 🆕 SUBJECT MANAGEMENT BUTTON - Quick Access Card
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            Log.d(TAG, "Navigating to Subject Management")
+                            navController.navigate(Screen.SubjectManagement.route)
+                        },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            // Icon with background
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.School,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
+
+                            Column {
+                                Text(
+                                    text = "Quản lý Môn học",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "Bạn đang có ${stats.third} môn học",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = "Go",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
                 // Quote Card with Elegant Design - Dynamic Motivation Quote
-                // Use remember to prevent quote from changing on recomposition
                 val motivationQuote = remember(randomMotivation) {
                     randomMotivation?.content ?: "Success is the sum of small efforts repeated day in and day out."
                 }
@@ -290,7 +363,6 @@ fun HomeScreen(
                                 lineHeight = 24.sp
                             )
 
-                            // Show author if available
                             if (motivationAuthor != null && motivationAuthor.isNotBlank()) {
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
@@ -314,8 +386,7 @@ fun HomeScreen(
                 ) {
                     // Urgent Card
                     Card(
-                        modifier = Modifier
-                            .weight(1f),
+                        modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(20.dp),
                         colors = CardDefaults.cardColors(
                             containerColor = Color(0xFFFF6B6B).copy(alpha = 0.1f)
@@ -328,10 +399,7 @@ fun HomeScreen(
                                 .padding(16.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Text(
-                                text = "⏰",
-                                fontSize = 32.sp
-                            )
+                            Text(text = "⏰", fontSize = 32.sp)
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 text = "${stats.first}",
@@ -351,8 +419,7 @@ fun HomeScreen(
 
                     // Progress Card
                     Card(
-                        modifier = Modifier
-                            .weight(1f),
+                        modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(20.dp),
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
@@ -364,10 +431,7 @@ fun HomeScreen(
                                 .fillMaxWidth()
                                 .padding(16.dp)
                         ) {
-                            Text(
-                                text = "📊",
-                                fontSize = 32.sp
-                            )
+                            Text(text = "📊", fontSize = 32.sp)
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 text = "${stats.second}%",
@@ -394,10 +458,14 @@ fun HomeScreen(
                         }
                     }
 
-                    // Subjects Card - NOW USING REAL SUBJECT COUNT
+                    // Subjects Card - Clickable to navigate
                     Card(
                         modifier = Modifier
-                            .weight(1f),
+                            .weight(1f)
+                            .clickable {
+                                Log.d(TAG, "Stats card clicked - Navigating to Subject Management")
+                                navController.navigate(Screen.SubjectManagement.route)
+                            },
                         shape = RoundedCornerShape(20.dp),
                         colors = CardDefaults.cardColors(
                             containerColor = Color(0xFF4ECDC4).copy(alpha = 0.1f)
@@ -410,10 +478,7 @@ fun HomeScreen(
                                 .padding(16.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Text(
-                                text = "📚",
-                                fontSize = 32.sp
-                            )
+                            Text(text = "📚", fontSize = 32.sp)
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 text = "${stats.third}",
@@ -520,7 +585,6 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // Events List
-                // Use eventsState instead of upcomingEventsState to include today's events
                 when (val state = eventsState) {
                     is UiState.Loading -> {
                         Box(
@@ -534,9 +598,6 @@ fun HomeScreen(
                     }
 
                     is UiState.Success -> {
-                        // Calculate filtered events based on selected filter
-                        // This will recompute whenever state.data or selectedFilter changes
-                        // Calculate start of today (00:00:00) to include all events from today onwards
                         val today = java.time.LocalDate.now()
                         val startOfToday = today.atStartOfDay()
                             .atZone(java.time.ZoneId.systemDefault())
@@ -544,15 +605,10 @@ fun HomeScreen(
                             .toEpochMilli()
 
                         val filteredEvents = when (selectedFilter) {
-                            1 -> {
-                                // Chưa hoàn thành: chỉ lấy events chưa completed và từ hôm nay trở đi
-                                state.data.filter {
-                                    !it.isCompleted &&
-                                            it.startDateTime >= startOfToday
-                                }
+                            1 -> state.data.filter {
+                                !it.isCompleted && it.startDateTime >= startOfToday
                             }
                             2 -> {
-                                // Đang thực hiện: events chưa hoàn thành và sắp tới trong 7 ngày
                                 val sevenDaysFromNow = startOfToday + (7 * 24 * 60 * 60 * 1000L)
                                 state.data.filter {
                                     !it.isCompleted &&
@@ -560,12 +616,8 @@ fun HomeScreen(
                                             it.startDateTime <= sevenDaysFromNow
                                 }
                             }
-                            else -> {
-                                // Tất cả: hiển thị tất cả events chưa hoàn thành từ hôm nay trở đi
-                                state.data.filter {
-                                    !it.isCompleted &&
-                                            it.startDateTime >= startOfToday
-                                }
+                            else -> state.data.filter {
+                                !it.isCompleted && it.startDateTime >= startOfToday
                             }
                         }
 
@@ -581,10 +633,7 @@ fun HomeScreen(
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.Center
                                 ) {
-                                    Text(
-                                        text = "📋",
-                                        fontSize = 48.sp
-                                    )
+                                    Text(text = "📋", fontSize = 48.sp)
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Text(
                                         text = when (selectedFilter) {
@@ -611,7 +660,7 @@ fun HomeScreen(
                                         },
                                         onEdit = {
                                             Log.d(TAG, "Edit event: ${event.id}")
-                                            navController.navigate("${Screen.AddEvent.route}?eventId=${event.id}")
+                                            navController.navigate(Screen.AddEvent.createRoute(event.id))
                                         },
                                         onDelete = {
                                             Log.d(TAG, "Delete event: ${event.id}")
@@ -642,10 +691,7 @@ fun HomeScreen(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.Center
                             ) {
-                                Text(
-                                    text = "❌",
-                                    fontSize = 48.sp
-                                )
+                                Text(text = "❌", fontSize = 48.sp)
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
                                     text = "Lỗi: ${state.error.message ?: "Lỗi không xác định"}",
@@ -678,7 +724,7 @@ fun HomeScreen(
 
     // Delete confirmation dialog
     showDeleteDialog?.let { event ->
-        smart.study.planner.presentation.components.DeleteConfirmationDialog(
+        DeleteConfirmationDialog(
             taskTitle = event.title,
             onConfirm = {
                 Log.d(TAG, "Confirmed delete for event: ${event.id}")
@@ -694,7 +740,7 @@ fun HomeScreen(
 
     // Task detail dialog
     showDetailDialog?.let { event ->
-        smart.study.planner.presentation.components.TaskDetailDialog(
+        TaskDetailDialog(
             event = event,
             onDismiss = {
                 Log.d(TAG, "Dismissed detail dialog")
@@ -703,7 +749,7 @@ fun HomeScreen(
             onEdit = {
                 Log.d(TAG, "Edit from detail dialog: ${event.id}")
                 showDetailDialog = null
-                navController.navigate("${Screen.AddEvent.route}?eventId=${event.id}")
+                navController.navigate(Screen.AddEvent.createRoute(event.id))
             }
         )
     }

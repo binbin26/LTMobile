@@ -75,7 +75,7 @@ fun ProfileScreen(
                         Screen.Home.route,
                         Screen.Calendar.route,
                         Screen.AddEvent.route,
-                        Screen.TaskList.route,
+                        Screen.Tasks.route,
                         Screen.Profile.route -> navController.navigate(route)
                     }
                 }

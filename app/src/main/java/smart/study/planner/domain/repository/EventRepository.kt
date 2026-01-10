@@ -72,8 +72,9 @@ interface EventRepository {
     
     /**
      * Toggle event completion status
+     * Returns the updated Event to ensure Room was updated successfully
      */
-    suspend fun toggleEventCompletion(eventId: String): Result<Unit>
+    suspend fun toggleEventCompletion(eventId: String): Result<Event>
     
     /**
      * Mark event as completed

@@ -148,6 +148,13 @@ class EventViewModel @Inject constructor(
                 _saveEventState.value = UiState.Error(Exception("Title cannot be empty."))
                 return@launch
             }
+            // Defensive ID validation
+            if (event.id.contains("{") || event.id.contains("?") || event.id.contains("}")) {
+                val ex = Exception("Invalid event ID format: ${event.id}")
+                Log.e(TAG, "Malformed event ID detected in saveEvent: ${event.id}")
+                _saveEventState.value = UiState.Error(ex)
+                return@launch
+            }
             try {
                 saveEventUseCase(event)
                 Log.d(TAG, "Event saved successfully!")
@@ -163,6 +170,13 @@ class EventViewModel @Inject constructor(
     fun updateEvent(event: Event) {
         viewModelScope.launch {
             _updateEventState.value = UiState.Loading
+            // Defensive ID validation
+            if (event.id.contains("{") || event.id.contains("?") || event.id.contains("}")) {
+                val ex = Exception("Invalid event ID format: ${event.id}")
+                Log.e(TAG, "Malformed event ID detected in updateEvent: ${event.id}")
+                _updateEventState.value = UiState.Error(ex)
+                return@launch
+            }
             try {
                 updateEventUseCase(event)
                 Log.d(TAG, "Event updated successfully: ${event.id}")
@@ -194,13 +208,41 @@ class EventViewModel @Inject constructor(
     fun toggleEventCompletion(eventId: String) {
         Log.d(TAG, "Toggling event completion: $eventId")
         viewModelScope.launch {
+            // ✅ Step 1: Optimistic UI update (immediate visual feedback)
+            val currentEvents = (_eventsState.value as? UiState.Success)?.data
+            val updatedEvents = currentEvents?.map { event ->
+                if (event.id == eventId) {
+                    Log.d(TAG, "🔄 Optimistic UI update: eventId=$eventId, isCompleted will toggle")
+                    event.copy(isCompleted = !event.isCompleted)
+                } else event
+            }
+            if (updatedEvents != null) {
+                _eventsState.value = UiState.Success(updatedEvents)
+                Log.d(TAG, "✅ Optimistic UI updated")
+            }
+
             try {
-                toggleEventCompletionUseCase(eventId)
-                Log.d(TAG, "Toggle successful - reloading data")
-                forceRefreshEvents()
+                // ✅ Step 2: Call UseCase and WAIT for Room update to complete
+                Log.d(TAG, "🔄 Calling toggleEventCompletionUseCase for eventId=$eventId")
+                val result = toggleEventCompletionUseCase(eventId)
+                
+                result.fold(
+                    onSuccess = { updatedEvent ->
+                        Log.d(TAG, "✅ Toggle completed and persisted to Room: eventId=$eventId, isCompleted=${updatedEvent.isCompleted}")
+                        // ✅ Room is updated, Firebase sync is in progress or queued
+                        // No need to reload immediately - optimistic UI already shows correct state
+                        // Future loads will get data from Room (source of truth)
+                    },
+                    onFailure = { e ->
+                        Log.e(TAG, "❌ Toggle UseCase returned failure: ${e.message}", e)
+                        // ✅ Rollback UI by reloading from authoritative Room source
+                        forceRefreshEvents()
+                    }
+                )
             } catch (e: Exception) {
-                Log.e(TAG, "Toggle failed", e)
-                // Decide if UI state needs to be updated on toggle failure
+                Log.e(TAG, "❌ Toggle failed with exception: ${e.message}", e)
+                // ✅ Rollback UI by reloading from authoritative source
+                forceRefreshEvents()
             }
         }
     }

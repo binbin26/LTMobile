@@ -30,7 +30,7 @@ fun BottomNavigationBar(
         BottomNavItem("Trang Chủ", Icons.Default.Home, Screen.Home.route),
         BottomNavItem("Lịch", Icons.Default.Settings, Screen.Calendar.route), // TODO: Thay bằng DateRange sau khi sync Gradle
         BottomNavItem("Thêm Mới", Icons.Default.Add, Screen.AddEvent.route),
-        BottomNavItem("Nhiệm vụ", Icons.Default.List, Screen.TaskList.route),
+        BottomNavItem("Nhiệm vụ", Icons.Default.List, Screen.Tasks.route),
         BottomNavItem("Tài khoản", Icons.Default.AccountCircle, Screen.Profile.route)
     )
     

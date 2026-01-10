@@ -131,7 +131,7 @@ fun CalendarScreen(
                             Log.d(TAG, "Navigating to AddEventScreen for NEW event")
                             navController.navigate(route)
                         }
-                        Screen.TaskList.route -> navController.navigate(route)
+                        Screen.Tasks.route -> navController.navigate(route)
                         else -> {}
                     }
                 }

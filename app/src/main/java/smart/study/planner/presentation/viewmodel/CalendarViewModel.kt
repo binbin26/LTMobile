@@ -1,5 +1,6 @@
 package smart.study.planner.presentation.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -24,6 +25,10 @@ import javax.inject.Inject
 class CalendarViewModel @Inject constructor(
     private val eventRepository: EventRepository
 ) : ViewModel() {
+    
+    companion object {
+        private const val TAG = "CalendarViewModel"
+    }
     
     private val _selectedDate = MutableStateFlow(LocalDate.now())
     val selectedDate: StateFlow<LocalDate> = _selectedDate.asStateFlow()
@@ -215,12 +220,14 @@ class CalendarViewModel @Inject constructor(
         viewModelScope.launch {
             eventRepository.toggleEventCompletion(eventId)
                 .fold(
-                    onSuccess = {
-                        // Reload events
+                    onSuccess = { updatedEvent ->
+                        Log.d(TAG, "✅ Toggle persisted to Room: eventId=$eventId, isCompleted=${updatedEvent.isCompleted}")
+                        // Reload events to reflect changes
                         loadEventsForMonth(_selectedMonth.value)
                         loadUpcomingEvents()
                     },
                     onFailure = { e ->
+                        Log.e(TAG, "❌ Failed to toggle event completion: ${e.message}", e)
                         _errorMessage.value = e.message ?: "Failed to update event"
                     }
                 )
