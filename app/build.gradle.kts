@@ -88,6 +88,12 @@ dependencies {
     // WorkManager
     implementation(libs.work.runtime.ktx)
     
+    // ✅ CRITICAL: Coroutines support for Google Play Services (for .await())
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
+    
+    // ✅ Guava (required by WorkManager for ListenableFuture)
+    implementation("com.google.guava:guava:32.1.3-android")
+    
     // Firebase
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.database.ktx)

@@ -1,8 +1,10 @@
 package smart.study.planner.data.repository
 
+import android.content.Context
 import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -13,6 +15,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import smart.study.planner.data.local.dao.EventDao
+import smart.study.planner.data.local.notification.ReminderScheduler
 import smart.study.planner.data.model.Event
 import smart.study.planner.data.model.SyncStatus
 import smart.study.planner.domain.repository.EventRepository
@@ -26,7 +29,8 @@ private const val TAG = "EventRepositoryImpl"
 @Singleton
 class EventRepositoryImpl @Inject constructor(
     private val eventDao: EventDao,
-    private val firebaseAuth: FirebaseAuth
+    private val firebaseAuth: FirebaseAuth,
+    @ApplicationContext private val context: Context
 ) : EventRepository {
 
     private fun eventsRef() = firebaseAuth.currentUser?.uid?.let { uid ->
@@ -154,6 +158,16 @@ class EventRepositoryImpl @Inject constructor(
         try {
             eventDao.insertEvent(event)
             syncEventToFirebase(event).getOrThrow()
+            
+            // Schedule deadline notifications if event has a deadline
+            Log.d(TAG, "📅 Scheduling deadline notifications for event: ${event.title}")
+            ReminderScheduler.scheduleAllDeadlineNotifications(
+                context,
+                event.id,
+                event.title,
+                event.endDateTime ?: event.startDateTime
+            )
+            
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e(TAG, "Error saving event: ${e.message}", e)
@@ -165,6 +179,16 @@ class EventRepositoryImpl @Inject constructor(
         try {
             eventDao.insertEvent(event)
             syncEventToFirebase(event).getOrThrow()
+            
+            // Schedule deadline notifications if event has a deadline
+            Log.d(TAG, "📅 Scheduling deadline notifications for new event: ${event.title}")
+            ReminderScheduler.scheduleAllDeadlineNotifications(
+                context,
+                event.id,
+                event.title,
+                event.endDateTime ?: event.startDateTime
+            )
+            
             Result.success(event.id)
         } catch (e: Exception) {
             Result.failure(e)
@@ -175,6 +199,17 @@ class EventRepositoryImpl @Inject constructor(
         try {
             eventDao.updateEvent(event)
             syncEventToFirebase(event).getOrThrow()
+            
+            // Reschedule deadline notifications for updated event
+            Log.d(TAG, "📅 Rescheduling deadline notifications for updated event: ${event.title}")
+            ReminderScheduler.cancelAllDeadlineNotifications(context, event.id)
+            ReminderScheduler.scheduleAllDeadlineNotifications(
+                context,
+                event.id,
+                event.title,
+                event.endDateTime ?: event.startDateTime
+            )
+            
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e(TAG, "Error updating event: ${e.message}", e)
@@ -187,6 +222,11 @@ class EventRepositoryImpl @Inject constructor(
             val userId = firebaseAuth.currentUser?.uid ?: throw IllegalStateException("User not logged in")
             eventDao.deleteEventById(id)
             deleteEventFromFirebase(userId, id).getOrThrow()
+            
+            // Cancel deadline notifications when event is deleted
+            Log.d(TAG, "🗑️ Cancelling deadline notifications for deleted event: $id")
+            ReminderScheduler.cancelAllDeadlineNotifications(context, id)
+            
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e(TAG, "Error deleting event: ${e.message}", e)

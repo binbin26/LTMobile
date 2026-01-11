@@ -21,6 +21,9 @@ import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Title
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -52,6 +55,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -69,7 +74,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 
@@ -131,6 +135,8 @@ fun AddEventScreen(
 
     val currentTime = System.currentTimeMillis()
     var selectedDate by rememberSaveable { mutableStateOf(currentTime) }
+    var selectedHour by rememberSaveable { mutableStateOf(0) }
+    var selectedMinute by rememberSaveable { mutableStateOf(0) }
     val datePickerBackground = MaterialTheme.colorScheme.surfaceVariant
 
     val saveState by viewModel.saveEventState.collectAsStateWithLifecycle()
@@ -164,6 +170,14 @@ fun AddEventScreen(
                 description = event.description
                 selectedCategory = event.category
                 selectedDate = event.startDateTime
+                
+                // ✅ THÊM: Load giờ và phút từ event
+                val cal = java.util.Calendar.getInstance().apply {
+                    timeInMillis = event.startDateTime
+                }
+                selectedHour = cal.get(java.util.Calendar.HOUR_OF_DAY)
+                selectedMinute = cal.get(java.util.Calendar.MINUTE)
+                
                 event.subjectId?.let {
                     selectedSubjectId = it
                 }
@@ -578,6 +592,123 @@ fun AddEventScreen(
                 }
             }
 
+            // Time Picker Section
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Schedule,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Text(
+                            text = "Thời Gian",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Hour input
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Giờ", style = MaterialTheme.typography.labelMedium)
+                            OutlinedTextField(
+                                value = String.format("%02d", selectedHour),
+                                onValueChange = { input ->
+                                    if (input.isBlank()) {
+                                        selectedHour = 0
+                                    } else {
+                                        val hour = input.toIntOrNull() ?: selectedHour
+                                        selectedHour = when {
+                                            hour < 0 -> 0
+                                            hour > 23 -> 23
+                                            else -> hour
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                                ),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            )
+                        }
+
+                        Text(":", style = MaterialTheme.typography.headlineLarge, modifier = Modifier.padding(vertical = 8.dp))
+
+                        // Minute input
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Phút", style = MaterialTheme.typography.labelMedium)
+                            OutlinedTextField(
+                                value = String.format("%02d", selectedMinute),
+                                onValueChange = { input ->
+                                    if (input.isBlank()) {
+                                        selectedMinute = 0
+                                    } else {
+                                        val minute = input.toIntOrNull() ?: selectedMinute
+                                        selectedMinute = when {
+                                            minute < 0 -> 0
+                                            minute > 59 -> 59
+                                            else -> minute
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                                ),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            )
+                        }
+                    }
+
+                    // Display selected time
+                    Text(
+                        text = "Thời gian đã chọn: ${String.format("%02d:%02d", selectedHour, selectedMinute)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+            }
+
             // Description Section
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -722,6 +853,15 @@ fun AddEventScreen(
 
                         Log.d(TAG, "Is creating new: $isCreatingNew, Final Event ID: $finalEventId")
 
+                        // ✅ Thêm giờ và phút vào timestamp
+                        val finalTimestamp = java.util.Calendar.getInstance().apply {
+                            timeInMillis = selectedDate
+                            set(java.util.Calendar.HOUR_OF_DAY, selectedHour)
+                            set(java.util.Calendar.MINUTE, selectedMinute)
+                            set(java.util.Calendar.SECOND, 0)
+                            set(java.util.Calendar.MILLISECOND, 0)
+                        }.timeInMillis
+
                         // ✅ Preserve original event fields when editing
                         val event = if (isCreatingNew) {
                             // Create new event
@@ -730,7 +870,7 @@ fun AddEventScreen(
                                 userId = currentUserId,
                                 title = title.trim(),
                                 description = description.trim(),
-                                startDateTime = selectedDate,
+                                startDateTime = finalTimestamp,
                                 endDateTime = null,
                                 location = "",
                                 category = selectedCategory,
@@ -754,7 +894,7 @@ fun AddEventScreen(
                                     id = finalEventId, // Keep original ID
                                     title = title.trim(),
                                     description = description.trim(),
-                                    startDateTime = selectedDate,
+                                    startDateTime = finalTimestamp,
                                     category = selectedCategory,
                                     updatedAt = System.currentTimeMillis(), // Update timestamp
                                     subjectId = selectedSubject?.id,
@@ -769,7 +909,7 @@ fun AddEventScreen(
                                     userId = currentUserId,
                                     title = title.trim(),
                                     description = description.trim(),
-                                    startDateTime = selectedDate,
+                                    startDateTime = finalTimestamp,
                                     endDateTime = null,
                                     location = "",
                                     category = selectedCategory,

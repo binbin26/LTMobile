@@ -1,9 +1,11 @@
 package smart.study.planner.presentation.viewmodel
 
+import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import smart.study.planner.data.model.Event
 import smart.study.planner.data.model.Holiday
 import smart.study.planner.data.model.Motivation
@@ -25,6 +27,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import smart.study.planner.data.local.notification.ReminderScheduler
 import javax.inject.Inject
 
 private const val TAG = "EventViewModel"
@@ -45,7 +48,8 @@ class EventViewModel @Inject constructor(
     private val syncPendingEventsUseCase: SyncPendingEventsUseCase,
     private val authRepository: AuthRepository,
     private val holidayRepository: HolidayRepository,
-    private val motivationRepository: MotivationRepository
+    private val motivationRepository: MotivationRepository,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _eventsState = MutableStateFlow<UiState<List<Event>>>(UiState.Idle)
@@ -344,6 +348,56 @@ class EventViewModel @Inject constructor(
         // This ensures we don't try to refresh if the list is empty or not loaded
         (_motivationsState.value as? UiState.Success)?.data?.takeIf { it.isNotEmpty() }?.let {
              _randomMotivation.value = it.random()
+        }
+    }
+
+    /**
+     * ✅ DEBUG: Check and log scheduled notifications status
+     * Call this from UI to debug notification system
+     */
+    fun debugCheckNotifications() {
+        viewModelScope.launch {
+            try {
+                Log.d(TAG, "Debug: Checking scheduled notifications...")
+                ReminderScheduler.checkScheduledNotificationsSync(context)
+
+                // Get detailed status string
+                val status = ReminderScheduler.getScheduledWorksStatusSync(context)
+                Log.d(TAG, "Scheduled works status:\n$status")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error checking notifications: ${e.message}", e)
+            }
+        }
+    }
+
+    /**
+     * ✅ DEBUG: Send test notifications immediately
+     * Useful for testing the notification system
+     */
+    fun testNotifications() {
+        viewModelScope.launch {
+            try {
+                Log.d(TAG, "Debug: Sending test notifications...")
+                ReminderScheduler.testDeadlineNotification(context, "test-123", "Test Deadline Event")
+                ReminderScheduler.testDeadlineExpiredNotification(context, "test-456", "Test Expired Event")
+                Log.d(TAG, "✅ Test notifications sent successfully")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error sending test notifications: ${e.message}", e)
+            }
+        }
+    }
+
+    /**
+     * ✅ DEBUG: Cancel all scheduled notifications (for testing/debugging only)
+     * WARNING: This will remove all pending notifications!
+     */
+    fun debugCancelAllNotifications() {
+        try {
+            Log.d(TAG, "Debug: Cancelling all scheduled notifications...")
+            ReminderScheduler.cancelAllScheduledNotifications(context)
+            Log.d(TAG, "✅ All notifications cancelled")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error cancelling notifications: ${e.message}", e)
         }
     }
 }
